@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate source asset + standalone tap, without network, git or publishing.
+"""Generate a source asset and root Formula/rmpkgx.rb for a single-repository tap.
 
 Requires Python 3.11+. Archives normalize timestamps and ownership so the same
 source tree gives the same checksum. Cargo dependencies are not bundled.
@@ -17,6 +17,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SOURCE_PATHS = (
     "Cargo.toml", "Cargo.lock", "LICENSE", "README.md", "CHANGELOG.md",
     "src", "tests", "scripts", "docs", "packaging", ".github", ".gitignore",
+    # Formula/ is intentionally excluded: its checksum describes this archive.
 )
 
 
@@ -70,65 +71,10 @@ def prepare(owner, output, root=ROOT):
     archive = output / f"rmpkgx-v{version}-source.tar.gz"
     checksum = create_archive(root, archive, version)
     archive.with_suffix(archive.suffix + ".sha256").write_text(f"{checksum}  {archive.name}\n")
-    tap = output / "homebrew-tap"
-    formula = tap / "Formula" / "rmpkgx.rb"
+    formula = root / "Formula" / "rmpkgx.rb"
     formula.parent.mkdir(parents=True, exist_ok=True)
     template = (root / "packaging/rmpkgx.rb.example").read_text()
     formula.write_text(template.replace("OWNER", owner).replace("VERSION", version).replace("REPLACE_WITH_VERIFIED_SHA256", checksum))
-    (tap / "LICENSE").write_bytes((root / "LICENSE").read_bytes())
-    (tap / "README.md").write_text(f"""# {owner}/tap
-
-Homebrew formula for [rmpkgx](https://github.com/{owner}/rmpkgx), macOS Apple Silicon.
-
-Publish this directory as `{owner}/homebrew-tap` after uploading the exact source
-asset referenced by `Formula/rmpkgx.rb` to release `v{version}` of `{owner}/rmpkgx`.
-This directory contains no git repository and nothing has been uploaded.
-
-## Install
-
-```sh
-brew tap {owner}/tap
-# On Homebrew versions requiring explicit tap trust, trust only this formula:
-brew trust --formula {owner}/tap/rmpkgx
-brew install --build-from-source {owner}/tap/rmpkgx
-brew test {owner}/tap/rmpkgx
-```
-
-Current Homebrew and Xcode Command Line Tools are required. Rust is a build dependency.
-Dependencies are fetched before the offline Cargo install; the installed app runs offline.
-No Developer ID certificate or notarization service is required for this source formula.
-
-```sh
-brew update
-brew upgrade {owner}/tap/rmpkgx
-brew uninstall {owner}/tap/rmpkgx
-```
-
-Updates require changing the URL, version and SHA-256 in the formula to a new immutable
-source asset. There are no prebuilt Homebrew bottles. This is an independent tap,
-not Homebrew Core. `brew uninstall` removes rmpkgx, not the user's operation history.
-""")
-    workflow = tap / ".github/workflows/test.yml"
-    workflow.parent.mkdir(parents=True, exist_ok=True)
-    workflow.write_text(f"""name: Formula test
-on: [push, pull_request, workflow_dispatch]
-permissions:
-  contents: read
-jobs:
-  test:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install and test the source formula
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: "1"
-        run: |
-          brew tap {owner}/tap "$GITHUB_WORKSPACE"
-          brew trust --formula {owner}/tap/rmpkgx
-          brew install --build-from-source {owner}/tap/rmpkgx
-          brew test {owner}/tap/rmpkgx
-          rmpkgx --version
-""")
     return archive, formula, checksum
 
 
@@ -141,7 +87,7 @@ def main():
         archive, formula, checksum = prepare(args.owner, args.output)
     except (ValueError, OSError) as error:
         parser.error(str(error))
-    print(f"Source asset: {archive}\nSHA-256: {checksum}\nTap formula: {formula}\nNothing published. Upload this exact asset; do not substitute GitHub's automatic source archive.")
+    print(f"Source asset: {archive}\nSHA-256: {checksum}\nRepository formula: {formula}\nNothing published. Upload this exact asset; do not substitute GitHub's automatic source archive.")
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ class PackagingTests(unittest.TestCase):
             (root / "target").mkdir()
             (root / "target/private").write_text("never package")
             archive, formula, sha = prepare.prepare("fixture-owner", root / "dist", root)
+            self.assertEqual(formula, root.resolve() / "Formula/rmpkgx.rb")
             original = archive.read_bytes()
             self.assertEqual(hashlib.sha256(original).hexdigest(), sha)
             self.assertIn(sha, formula.read_text())
@@ -38,6 +39,7 @@ class PackagingTests(unittest.TestCase):
             with tarfile.open(archive) as package:
                 names = package.getnames()
                 self.assertIn("rmpkgx-0.1.0/Cargo.lock", names)
+                self.assertFalse(any("/Formula/" in name for name in names))
                 self.assertFalse(any(".env" in name or "/target/" in name or "/dist/" in name for name in names))
             prepare.prepare("fixture-owner", root / "dist", root)
             self.assertEqual(original, archive.read_bytes())

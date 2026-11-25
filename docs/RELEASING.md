@@ -58,11 +58,11 @@ real system-Trash and visual acceptance checks. Do not call uninspected data cle
 
 CI checks formatting, Clippy, tests and the Apple Silicon release build. The release
 candidate job repeats checks, uses the same packaging script, tests the extracted
-executable and uploads workflow artifacts only. A future `v0.1.0` tag must match
+executable and uploads workflow artifacts (including Formula/rmpkgx.rb) only. A future `v0.1.0` tag must match
 the executable version; a mismatch fails packaging. `workflow_dispatch` also creates
 candidates without publishing a release. Permissions are read-only for repository
 contents; there is no release-publishing action.
 
 Before any authorized publication, run `python3 scripts/prepare-homebrew.py --owner YOUR_LOGIN`.
-Use the generated source asset and tap formula together; its checksum is filled
+Use the generated source asset and root Formula/rmpkgx.rb together; its checksum is filled
 automatically. Review all release notes and known limitations. Publishing remains manual. See [Homebrew publication](HOMEBREW.md): the source formula does not require Developer ID signing or notarization.

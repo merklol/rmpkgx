@@ -1,134 +1,85 @@
-# Публикация rmpkgx в собственном Homebrew tap
+# Публикация через один репозиторий
 
-Все загрузки выполняешь ты. Скрипты не создают репозитории, не делают коммиты,
-не отправляют теги и не публикуют релизы. Это независимый tap, а не Homebrew Core.
-Developer ID, платная программа Apple и нотаризация для source formula не нужны.
+Используем только **merklol/rmpkgx**: исходники и `Formula/rmpkgx.rb` находятся
+в одном репозитории. Отдельный `homebrew-tap` не нужен. Скрипты ничего не публикуют.
 
-Нужны два публичных репозитория одного владельца:
-
-- `YOUR_LOGIN/rmpkgx` — код и релизные файлы;
-- `YOUR_LOGIN/homebrew-tap` — содержимое сгенерированной папки tap.
-
-`YOUR_LOGIN` ниже замени на GitHub-логин или организацию. Имена репозиториев
-фиксированы генератором; `homebrew-tap` устанавливается как `YOUR_LOGIN/tap`.
-
-## 1. Подготовить исходники
-
-На Apple Silicon Mac со stable Rust и Python 3.11+:
+## 1. Подготовка и загрузка кода
 
 ```sh
-cargo fmt --check
-cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked
-python3 scripts/test-prepare-homebrew.py
-python3 scripts/prepare-homebrew.py --owner YOUR_LOGIN
+python3 scripts/prepare-homebrew.py --owner merklol
+git add .
+git commit -m "Prepare single-repository Homebrew installation"
+git push -u origin main
 ```
 
-Результат в `dist/homebrew/`:
+Git-репозиторий и origin уже должны существовать. Если push просит пароль GitHub,
+используй personal access token с Contents и Workflows Read and write вместо
+пароля аккаунта либо настрой SSH. Сам токен не вставляй в команды и не публикуй.
 
-```text
-rmpkgx-v0.1.0-source.tar.gz
-rmpkgx-v0.1.0-source.tar.gz.sha256
-homebrew-tap/
-  Formula/rmpkgx.rb
-  README.md
-  LICENSE
-  .github/workflows/test.yml
-```
+В Git загружается `Formula/rmpkgx.rb`, исходники и документация. `dist/` и `target/`
+игнорируются. Старую сгенерированную папку `dist/homebrew/homebrew-tap/` не используй.
 
-Архив содержит Cargo.toml, Cargo.lock, исходники, тесты и документацию.
-Сборочные файлы `target/`, артефакты `dist/`, `.git` и корневая `.env` исключены.
-Файлы исходников включаются по явному списку каталогов: перед публикацией проверь,
-что сам не добавил секреты в код, документацию или scripts. Символические ссылки
-генератор отклоняет. Архив не содержит сторонние Cargo-зависимости: их скачает brew
-на стадии fetch, затем install работает без сети.
+## 2. Опубликовать релиз
 
-SHA-256 в formula уже соответствует **этому** архиву. Не подставляй другой архив,
-включая автоматические GitHub `Source code (tar.gz)` и готовый arm64-бинарник.
-Одинаковые исходники и права файлов дают одинаковые архивы: даты и владельцы
-нормализованы. После изменения любых включённых файлов запусти генератор снова.
+Открой https://github.com/merklol/rmpkgx/releases/new и создай релиз **v0.1.0**
+для загруженного кода. Прикрепи ровно эти два файла:
 
-## 2. Загрузить основной репозиторий
+- `dist/homebrew/rmpkgx-v0.1.0-source.tar.gz`
+- `dist/homebrew/rmpkgx-v0.1.0-source.tar.gz.sha256`
 
-Загрузи исходники проекта в `YOUR_LOGIN/rmpkgx`, включая Cargo.lock, scripts,
-docs, packaging и `.github`. Не загружай `target/` и `dist/` в историю Git — они
-уже в `.gitignore`. Локальный git-репозиторий и тег автоматически не создаются.
+Папку можно открыть командой `open dist/homebrew`.
 
-В GitHub создай release `v0.1.0` для загруженного коммита. Прикрепи два файла
-из `dist/homebrew/`: source.tar.gz и его .sha256. Описание релиза можно взять
-из CHANGELOG.md. До публикации проверь ограничения и результаты испытаний;
-публикация в brew не означает, что все сценарии настоящей macOS Trash проверены.
+Используй только архив от последнего запуска генератора: его SHA-256 уже записан
+в корневую formula. Не подставляй автоматический GitHub Source code (tar.gz)
+или архив готового arm64-бинарника. Если release v0.1.0 уже опубликован и доступен
+пользователям, не заменяй его другими байтами: сначала увеличь версию и выпусти новый тег.
 
-Workflow основного проекта может собрать те же файлы как Actions artifacts,
-используя владельца репозитория. Он **не публикует** GitHub release и не меняет tap.
-Если используешь артефакт workflow, бери source-архив и formula из одного запуска.
+Архив содержит исходники, Cargo.lock, тесты и документацию по явному списку
+каталогов. `Formula/` исключена, чтобы запись SHA-256 не меняла сам архив;
+`target/`, `dist/`, `.git`, корневая `.env` и Python-кеш также исключены.
+Ссылки отклоняются, даты и владельцы нормализуются. Перед выпуском проверь,
+что секреты не добавлены в сами исходники или документацию.
 
-Проверь публичную загрузку после публикации:
+## 3. Проверить Homebrew
+
+После публикации source-архива:
 
 ```sh
-curl --fail --location --output /tmp/rmpkgx-v0.1.0-source.tar.gz \
-  https://github.com/YOUR_LOGIN/rmpkgx/releases/download/v0.1.0/rmpkgx-v0.1.0-source.tar.gz
-shasum -a 256 /tmp/rmpkgx-v0.1.0-source.tar.gz
-```
-
-Хеш должен совпадать с `sha256` в сгенерированном `Formula/rmpkgx.rb`.
-Не перемещай опубликованный тег и не заменяй архив другими байтами: исправления
-выпускай новой версией.
-
-## 3. Загрузить tap
-
-В `YOUR_LOGIN/homebrew-tap` загрузи **содержимое**
-`dist/homebrew/homebrew-tap/`. В корне репозитория должна оказаться `Formula/`,
-а не ещё одна вложенная папка `homebrew-tap/`. Не забудь скрытую `.github/`.
-
-Публикуй tap после того, как source-архив доступен по указанному URL.
-Workflow tap установит formula из исходников и выполнит `brew test` на Apple Silicon.
-GitHub Actions здесь не проверены запуском из локальной среды; после загрузки
-проверь их результат в обоих репозиториях.
-
-## 4. Проверить установку через Homebrew
-
-На своём Mac после публикации:
-
-```sh
-brew tap YOUR_LOGIN/tap
-brew trust --formula YOUR_LOGIN/tap/rmpkgx
-brew install --build-from-source YOUR_LOGIN/tap/rmpkgx
-brew test YOUR_LOGIN/tap/rmpkgx
+brew tap merklol/rmpkgx https://github.com/merklol/rmpkgx.git
+brew trust --formula merklol/rmpkgx/rmpkgx
+brew install --build-from-source merklol/rmpkgx/rmpkgx
+brew test merklol/rmpkgx/rmpkgx
 rmpkgx --version
 rmpkgx
 ```
 
-Для старой версии Homebrew без `brew trust` сначала обнови Homebrew. Доверие
-разрешает выполнять код formula; запрашивается только для одной formula, не всего tap.
-На первом запуске установятся Rust и зависимости сборки. Во время обычной работы
-rmpkgx сеть не использует. Bottles пока нет: сборка выполняется на компьютере пользователя.
+Явный URL позволяет использовать репозиторий `rmpkgx` без префикса `homebrew-`.
+В новых версиях Homebrew необходимо доверие конкретной formula. Если команда
+`brew trust` неизвестна, сначала обнови Homebrew.
 
-В ограниченной локальной среде проекта запись в `/opt/homebrew/Cellar` может быть
-запрещена. Изолированный Cargo-install из source-архива не заменяет этот настоящий
-`brew install` и запуск workflow — их результат нужно проверить после загрузки.
-`brew test` проверяет только version/help и корректный отказ без TTY, не удаляет приложения.
+Вкладка Actions → **Homebrew source installation** → Run workflow запускает
+настоящие `brew install` и `brew test` на Apple Silicon. Workflow ручной, чтобы
+не пытаться установить ещё не опубликованный release asset. Он ничего не публикует.
 
-## 5. Обновления и удаление
+Developer ID и нотаризация для этой source formula не требуются. Rust — зависимость
+сборки, Cargo-зависимости скачиваются на стадии fetch; install и сама утилита работают
+без сети. Bottles не подготовлены: сборка идёт на компьютере пользователя.
 
-Для следующего выпуска измени версию в Cargo.toml, обнови CHANGELOG.md и повтори
-генерацию. Выложи новый source-архив с новым тегом, затем обнови formula в tap.
-Не требуется подписка Apple или переустановка самого tap.
+Локальная среда проекта запрещает запись в `/opt/homebrew`, поэтому изолированный
+Cargo-install и загрузка Homebrew DSL не заменяют реальный brew install. Финальную
+проверку установки и workflow нужно выполнить после публикации. `brew test` не
+удаляет приложения и не сканирует пользовательскую Library.
 
-Пользователь обновляет утилиту:
+## Обновления
+
+Измени версию Cargo.toml и CHANGELOG.md, затем повтори генерацию, загрузку кода
+и публикацию source assets. Пользователь обновляет так:
 
 ```sh
 brew update
-brew upgrade YOUR_LOGIN/tap/rmpkgx
+brew upgrade merklol/rmpkgx/rmpkgx
 ```
 
-Удаление самой утилиты:
+Удаление: `brew uninstall merklol/rmpkgx/rmpkgx`. Журналы rmpkgx сохраняются.
 
-```sh
-brew uninstall YOUR_LOGIN/tap/rmpkgx
-```
-
-Журналы в пользовательской Library при этом сохраняются.
-
-Документация: [Homebrew taps](https://docs.brew.sh/How-to-Create-and-Maintain-a-Tap),
-[Rust formulae](https://docs.brew.sh/Language-Specific-Formulae#rust).
+[Homebrew tap documentation](https://docs.brew.sh/How-to-Create-and-Maintain-a-Tap)

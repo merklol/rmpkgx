@@ -1,0 +1,19 @@
+name: Homebrew source installation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install and test from the same repository
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: |
+          brew tap "$GITHUB_REPOSITORY" "$GITHUB_WORKSPACE"
+          brew trust --formula "$GITHUB_REPOSITORY/rmpkgx"
+          brew install --build-from-source "$GITHUB_REPOSITORY/rmpkgx"
+          brew test "$GITHUB_REPOSITORY/rmpkgx"
+          rmpkgx --version

@@ -23,7 +23,7 @@ jobs:
       - run: cargo test --locked
       - name: Build Apple Silicon candidate and checksum
         run: ./scripts/package-release.sh
-      - name: Prepare source asset and independent Homebrew tap
+      - name: Prepare source asset and single-repository formula
         run: python3 scripts/prepare-homebrew.py --owner "$GITHUB_REPOSITORY_OWNER"
       - name: Check packaged executable
         run: |
@@ -35,5 +35,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: rmpkgx-apple-silicon-candidate
-          path: dist/
+          path: |
+            dist/
+            Formula/rmpkgx.rb
           if-no-files-found: error
